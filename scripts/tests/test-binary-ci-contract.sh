@@ -81,8 +81,8 @@ if [[ -n $binary_matrix ]]; then
     'binary-matrix amd64/ubuntu-latest mapping'
   require_regex "$binary_matrix" 'arm64=.*arch[^[:alnum:]]+arm64.*runner[^[:alnum:]]+ubuntu-24\.04-arm' \
     'binary-matrix arm64/ubuntu-24.04-arm mapping'
-  require_regex "$binary_matrix" 'if .*EVENT_NAME.*pull_request' \
-    'binary-matrix pull-request branch'
+  require_regex "$binary_matrix" 'if .*REF_TYPE.*tag' \
+    'binary-matrix release-tag branch'
   require_regex "$binary_matrix" 'echo .*\$amd64.*GITHUB_OUTPUT' \
     'binary-matrix pull-request amd64 output'
   require_regex "$binary_matrix" 'echo .*\$amd64.*\$arm64.*GITHUB_OUTPUT' \
@@ -95,13 +95,17 @@ if [[ -n $binary_matrix ]]; then
     body { sub(/^          /, ""); print }
   ' "$CI_WORKFLOW")
   for event_and_expected in \
-    'pull_request|json=[{"arch":"amd64","runner":"ubuntu-latest"}]|darwin_json=["amd64"]' \
-    'push|json=[{"arch":"amd64","runner":"ubuntu-latest"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]|darwin_json=["amd64","arm64"]'; do
+    'pull_request|pull_request|linux_json=[{"arch":"amd64","runner":"ubuntu-latest"}]|darwin_json=["amd64"]' \
+    'push|branch|linux_json=[{"arch":"amd64","runner":"ubuntu-latest"}]|darwin_json=["amd64"]' \
+    'push|tag|linux_json=[{"arch":"amd64","runner":"ubuntu-latest"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]|darwin_json=["amd64","arm64"]'; do
     event=${event_and_expected%%|*}
-    expected=${event_and_expected#*|}
+    rest=${event_and_expected#*|}
+    ref_type=${rest%%|*}
+    expected=${rest#*|}
     expected=${expected//|/$'\n'}
     output="$TEST_ROOT/matrix-$event"
-    if ! EVENT_NAME="$event" GITHUB_OUTPUT="$output" bash -euo pipefail -c "$matrix_script"; then
+    : > "$output"
+    if ! EVENT_NAME="$event" REF_TYPE="$ref_type" GITHUB_OUTPUT="$output" bash -euo pipefail -c "$matrix_script"; then
       fail "binary-matrix $event dry run"
       continue
     fi
@@ -130,6 +134,8 @@ if [[ -n $binary_darwin ]]; then
 fi
 
 if [[ -n $binary_darwin_native ]]; then
+  require_regex "$binary_darwin_native" "if:[[:space:]]*github\\.ref_type[[:space:]]*==[[:space:]]*'tag'.*startsWith" \
+    'binary-darwin-native release-tag guard'
   require_regex "$binary_darwin_native" 'runs-on:[[:space:]]*macos' \
     'binary-darwin-native macOS runner'
   require_regex "$binary_darwin_native" 'darwin-docker' \
