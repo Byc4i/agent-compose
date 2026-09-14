@@ -5,7 +5,6 @@ on:
     paths:
       - .github/workflows/images.yml
       - Dockerfile
-      - cmd/**
       - deploy/**
       - docker-compose.yml
       - docker-compose.kvm.yml
@@ -14,10 +13,23 @@ on:
       - guest-images/**
       - go.mod
       - go.sum
-      - pkg/**
       - proto/**
+      - buf.yaml
+      - buf.gen.yaml
+      - cmd/**
+      - internal/**
+      - pkg/**
+      - assets/**
       - runtime/**
-      - scripts/**
+      - scripts/build-agent-compose-binary.sh
+      - scripts/build-agent-compose.sh
+      - scripts/build-agent-compose-guest.sh
+      - scripts/with-go-toolchain.sh
+      # Test-only and documentation changes do not alter the published images.
+      - '!**/*_test.go'
+      - '!**/*.test.ts'
+      - '!**/*.test.js'
+      - '!**/__tests__/**'
   push:
     branches:
       - main
