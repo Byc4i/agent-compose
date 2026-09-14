@@ -215,6 +215,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       linux_platforms: ${{ steps.platforms.outputs.json }}
+      darwin_platforms: ${{ steps.platforms.outputs.darwin_json }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate binary CI contract
@@ -227,8 +228,10 @@ jobs:
           arm64='{"arch":"arm64","runner":"ubuntu-24.04-arm"}'
           if [ "$EVENT_NAME" = "pull_request" ]; then
             echo "json=[$amd64]" >> "$GITHUB_OUTPUT"
+            echo "darwin_json=[\"amd64\"]" >> "$GITHUB_OUTPUT"
           else
             echo "json=[$amd64,$arm64]" >> "$GITHUB_OUTPUT"
+            echo "darwin_json=[\"amd64\",\"arm64\"]" >> "$GITHUB_OUTPUT"
           fi
 
   binary-darwin:
@@ -238,7 +241,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        # Pull requests use amd64; main and tags use amd64 and arm64.
+        arch: ${{ fromJSON(needs.binary-matrix.outputs.darwin_platforms) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -294,6 +298,7 @@ jobs:
   binary-darwin-native:
     name: Darwin native binary smoke
     needs: binary-matrix
+    if: github.event_name != 'pull_request'
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4

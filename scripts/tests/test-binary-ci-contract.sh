@@ -95,10 +95,11 @@ if [[ -n $binary_matrix ]]; then
     body { sub(/^          /, ""); print }
   ' "$CI_WORKFLOW")
   for event_and_expected in \
-    'pull_request|json=[{"arch":"amd64","runner":"ubuntu-latest"}]' \
-    'push|json=[{"arch":"amd64","runner":"ubuntu-latest"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]'; do
+    'pull_request|json=[{"arch":"amd64","runner":"ubuntu-latest"}]|darwin_json=["amd64"]' \
+    'push|json=[{"arch":"amd64","runner":"ubuntu-latest"},{"arch":"arm64","runner":"ubuntu-24.04-arm"}]|darwin_json=["amd64","arm64"]'; do
     event=${event_and_expected%%|*}
     expected=${event_and_expected#*|}
+    expected=${expected//|/$'\n'}
     output="$TEST_ROOT/matrix-$event"
     if ! EVENT_NAME="$event" GITHUB_OUTPUT="$output" bash -euo pipefail -c "$matrix_script"; then
       fail "binary-matrix $event dry run"
