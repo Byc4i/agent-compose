@@ -25,6 +25,11 @@ on:
       - scripts/build-agent-compose.sh
       - scripts/build-agent-compose-guest.sh
       - scripts/with-go-toolchain.sh
+      - scripts/build-installer-assets.sh
+      - scripts/test-image-docker-e2e.sh
+      - scripts/tests/test-image-ci-contract.sh
+      - scripts/verify-agent-compose-image.sh
+      - scripts/verify-image-manifest.sh
       # Test-only and documentation changes do not alter the published images.
       - '!**/*_test.go'
       - '!**/*.test.ts'

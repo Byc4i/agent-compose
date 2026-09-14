@@ -116,6 +116,8 @@ metadata_verifier='(\./)?scripts/[[:alnum:]_.-]*(verify|test)[[:alnum:]_.-]*(bin
 if [[ -n $binary_darwin ]]; then
   require_regex "$binary_darwin" 'strategy:' 'binary-darwin strategy'
   require_regex "$binary_darwin" 'matrix:' 'binary-darwin matrix'
+  require_regex "$binary_darwin" 'fromJSON\(needs\.binary-matrix\.outputs\.darwin_platforms\)' \
+    'binary-darwin dynamic matrix output'
   require_regex "$binary_darwin" 'amd64' 'binary-darwin amd64 target'
   require_regex "$binary_darwin" 'arm64' 'binary-darwin arm64 target'
   require_regex "$binary_darwin" 'darwin-docker' 'binary-darwin darwin-docker profile'
