@@ -274,10 +274,11 @@ Each `workspaces.<key>` accepts:
 | Field | Type | Applicability | Purpose |
 | --- | --- | --- | --- |
 | `name` | string | Compatibility field | The map key is the effective project workspace name. Normally omit this redundant field. |
-| `provider` | string | Required | `file` or `git`. |
-| `url` | string | Required for `git` | Git clone URL. It is forbidden for `file`. |
-| `ref` | string | Optional for `git` | Git branch, tag, or commit. |
-| `path` | string | Required for `file` | Source path relative to the compose directory; it cannot escape the project root. Git workspaces do not support a repository subpath. |
+| `provider` | string | Required | `file`, `git`, or `http`. |
+| `url` | string | Required for `git` and `http` | Git clone URL, or an `http`/`https` URL to a ZIP archive. It is forbidden for `file`. |
+| `ref` | string | Optional for `git` | Git branch, tag, or commit. `http` workspaces do not support a ref. |
+| `path` | string | Required for `file` | Source path relative to the compose directory; it cannot escape the project root. Git workspaces do not support a repository subpath. For `http`, an optional directory inside the archive. |
+| `format` | string | Required for `http` | Must be `zip`; the URL is downloaded and extracted as an isolated workspace. `path`, when set, must select an existing directory inside the archive. |
 | `target` | string | Optional | Destination below the sandbox workspace root. Defaults to `.`. |
 | `mode` | string | Optional | `copy` (default) creates an isolated workspace. `mount` maps a local `file` source directly into a Docker sandbox. |
 | `read_only` | bool | Optional for `mount` | Defaults to `false`. Set `true` to prevent guest writes through the workspace mount; `true` is invalid with `copy`. |
@@ -297,7 +298,37 @@ workspaces:
     url: https://github.com/example/service.git
     ref: release
     target: .
+  remote-release:
+    provider: http
+    url: https://example.com/releases/service.zip
+    format: zip
+    path: service
+    target: .
 ```
+
+### Fetch a ZIP workspace over HTTP
+
+An `http` workspace downloads a ZIP archive when the run prepares its sandbox and extracts it into the run workspace, so every run starts from the content the URL served:
+
+```yaml
+workspaces:
+  remote-release:
+    provider: http
+    url: https://artifacts.example.com/releases/service.zip
+    format: zip
+    token: ${ARTIFACT_TOKEN}
+    path: service
+    target: src
+```
+
+Behavior:
+
+- Only `http` and `https` URLs are accepted, redirects are revalidated against the same rule, and a redirect may not downgrade `https` to `http`, so credentials are never resent over cleartext. The request ignores proxy environment variables so a proxy cannot resolve the target on the daemon's behalf. Internal hosts are supported: the URL may resolve to a loopback or private address, such as another Docker Compose service name, a published loopback port, or a host on the daemon's private network. Skill sources follow the same rules.
+- `path` must name a directory that exists inside the archive. A `path` that names a file, or that is absent from the archive, fails the run instead of producing an empty workspace, and a `path` that escapes the archive (`../`, an absolute path) is rejected.
+- Archive entries are validated before they are written: entries that escape the destination and symlink entries are rejected, and entry permissions are sanitized (executable bits are preserved, group and other write bits are cleared, and setuid, setgid, and sticky bits are dropped).
+- Per-workspace limits: 256 MiB downloaded archive, 1 GiB expanded content, 100,000 entries, a 100:1 compression ratio once an archive expands beyond 64 MiB, and a 10 minute fetch timeout. Exceeding any limit fails the run.
+- `username`, `password`, and `token` accept exact environment references such as `${NAME}`; a token is sent as `Authorization: Bearer`, and basic credentials are only used when no token is configured.
+- `mode: mount` is not supported for `http`; the archive is always copied into the run workspace.
 
 Workspace selection follows these rules:
 
@@ -844,7 +875,9 @@ skills:
 | `password` | string | HTTP/Git password. Only an exact environment reference such as `${NAME}` is allowed. |
 | `token` | string | HTTP/Git token. Only an exact environment reference such as `${NAME}` is allowed. |
 
-`password` and `token` cannot contain plaintext. During `config` or `up`, the CLI resolves their exact `${NAME}` references from the project dotenv/process environment before submitting the project to the daemon; a reference whose variable is absent is kept as-is and resolved at clone time instead of failing. User-facing normalized output and project APIs redact the resolved credentials. Remote ZIP downloads are restricted to HTTP(S) and are subject to size, archive, and network-address safety checks.
+A `git` or `http` skill may also come from an internal host, such as an internal GitLab or an artifact server: private and loopback addresses are accepted, because the daemon resolves that host itself. Only `http` and `https` URLs are fetched over the network; any other URL is treated as a local source and must stay under an allowed source root.
+
+`password` and `token` cannot contain plaintext. During `config` or `up`, the CLI resolves their exact `${NAME}` references from the project dotenv/process environment before submitting the project to the daemon; a reference whose variable is absent is kept as-is and resolved at clone time instead of failing. User-facing normalized output and project APIs redact the resolved credentials. Remote ZIP downloads are restricted to HTTP(S), may point at an internal host (private and loopback addresses are accepted), and are subject to size, archive, and content checks.
 
 Git refs are resolved at each business lifecycle: skills during an agent run, workspaces during sandbox provisioning, and scheduler sources during `config`/`up` before the script snapshot is stored. A moving branch can therefore resolve to different commits across those operations. Use a commit SHA in `ref` when all consumers must use the exact same revision.
 

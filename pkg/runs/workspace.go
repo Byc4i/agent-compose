@@ -76,6 +76,18 @@ func (c *Controller) prepareProjectRunWorkspace(ctx context.Context, run domain.
 			return nil, err
 		}
 		return &config, nil
+	case sources.ProviderHTTP:
+		config, err := workspaces.NewHTTPWorkspaceConfig(
+			WorkspaceID(run, "http"),
+			WorkspaceName(run, "http"),
+			fmt.Sprintf("project run %s http workspace snapshot", run.RunID),
+			workspace.ContentSource(),
+			workspace.Target,
+		)
+		if err != nil {
+			return nil, err
+		}
+		return &config, nil
 	default:
 		if provider == "" {
 			return nil, fmt.Errorf("workspace provider is required")
